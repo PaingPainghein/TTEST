@@ -1,10 +1,152 @@
-<!DOCTYPE html>
-<html>
+<<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>My App</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIP Users Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.30.0"></script>
+    <style>
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+        .modal-content { background: white; margin: 15% auto; padding: 20px; width: 90%; max-width: 500px; border-radius: 8px; }
+        .toast { position: fixed; bottom: 20px; right: 20px; background: #333; color: white; padding: 10px 20px; border-radius: 4px; z-index: 2000; }
+        .error { background: #f44336; }
+        .success { background: #4caf50; }
+        .progress { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; z-index: 3000; }
+    </style>
 </head>
-<body>
-    <h1>Welcome to My App</h1>
-    <p>This is hosted on GitHub Pages</p>
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-4">
+        <!-- Toolbar -->
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="text-2xl font-bold">VIP Users</h1>
+            <div class="space-x-2">
+                <button id="refreshBtn" class="p-2 bg-blue-500 text-white rounded">Refresh</button>
+                <button id="addUserBtn" class="p-2 bg-green-500 text-white rounded">Add User</button>
+                <button id="syncBtn" class="p-2 bg-purple-500 text-white rounded">Sync</button>
+                <button id="expiredToggleBtn" class="p-2 bg-yellow-500 text-white rounded">Show Expired</button>
+                <button id="configBtn" class="p-2 bg-gray-500 text-white rounded">Config</button>
+            </div>
+        </div>
+
+        <!-- Search and User Count -->
+        <div class="flex mb-4">
+            <input id="searchInput" type="text" placeholder="Search by ID or Name" class="p-2 border rounded flex-grow">
+            <button id="clearSearchBtn" class="p-2 bg-gray-300 ml-2 rounded">Clear</button>
+        </div>
+        <p id="userCount" class="mb-4"></p>
+
+        <!-- Users Table -->
+        <table class="w-full border-collapse bg-white shadow">
+            <thead>
+                <tr class="bg-gray-200">
+                    <th class="p-2 border">ID</th>
+                    <th class="p-2 border">Name</th>
+                    <th class="p-2 border">Key</th>
+                    <th class="p-2 border">Start Date</th>
+                    <th class="p-2 border">Months</th>
+                    <th class="p-2 border">Valid Days</th>
+                    <th class="p-2 border">Expiration</th>
+                    <th class="p-2 border">Status</th>
+                    <th class="p-2 border">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="usersTable"></tbody>
+        </table>
+    </div>
+
+    <!-- Add/Edit User Modal -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <h2 id="userModalTitle" class="text-xl font-bold mb-4"></h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block">User ID</label>
+                    <input id="userIdInput" type="text" class="p-2 border rounded w-full" disabled>
+                </div>
+                <div>
+                    <label class="block">Name</label>
+                    <input id="nameInput" type="text" class="p-2 border rounded w-full">
+                    <p id="nameError" class="text-red-500 text-sm hidden"></p>
+                </div>
+                <div>
+                    <label class="block">Key</label>
+                    <input id="keyInput" type="text" class="p-2 border rounded w-full">
+                    <p id="keyError" class="text-red-500 text-sm hidden"></p>
+                </div>
+                <div>
+                    <label class="block">Start Date</label>
+                    <input id="startDateInput" type="date" class="p-2 border rounded w-full">
+                    <p id="startDateError" class="text-red-500 text-sm hidden"></p>
+                </div>
+                <div>
+                    <label class="block">Months</label>
+                    <input id="monthInput" type="number" min="0" class="p-2 border rounded w-full">
+                </div>
+                <div>
+                    <label class="block">Valid Days</label>
+                    <input id="validInput" type="number" min="0" class="p-2 border rounded w-full">
+                </div>
+                <div>
+                    <label class="block">Expiration</label>
+                    <input id="expirationInput" type="text" class="p-2 border rounded w-full" disabled>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-2 mt-4">
+                <button id="cancelUserBtn" class="p-2 bg-gray-300 rounded">Cancel</button>
+                <button id="saveUserBtn" class="p-2 bg-blue-500 text-white rounded"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Config Modal -->
+    <div id="configModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">API Configuration</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block">API URL</label>
+                    <input id="apiUrlInput" type="text" class="p-2 border rounded w-full">
+                    <p id="apiUrlError" class="text-red-500 text-sm hidden"></p>
+                </div>
+                <div>
+                    <label class="block">API Key</label>
+                    <input id="apiKeyInput" type="password" class="p-2 border rounded w-full">
+                    <p id="apiKeyError" class="text-red-500 text-sm hidden"></p>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-2 mt-4">
+                <button id="cancelConfigBtn" class="p-2 bg-gray-300 rounded">Cancel</button>
+                <button id="saveConfigBtn" class="p-2 bg-blue-500 text-white rounded">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync Modal -->
+    <div id="syncModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Sync Options</h2>
+            <div class="space-y-2">
+                <button id="downloadSyncBtn" class="p-2 bg-blue-500 text-white rounded w-full">Download from Sheet</button>
+                <button id="uploadSyncBtn" class="p-2 bg-blue-500 text-white rounded w-full">Upload to Sheet</button>
+                <button id="fullSyncBtn" class="p-2 bg-blue-500 text-white rounded w-full">Full Sync</button>
+            </div>
+            <div class="flex justify-end mt-4">
+                <button id="cancelSyncBtn" class="p-2 bg-gray-300 rounded">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Dialog -->
+    <div id="progressModal" class="modal hidden">
+        <div class="progress">
+            <p id="progressMessage" class="text-center">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="app.js"></script>
 </body>
 </html>
